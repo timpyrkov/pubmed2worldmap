@@ -335,7 +335,7 @@ def get_countries(*args, sort_by_gdp=True):
     data = gc.get_countries()
     df = pd.DataFrame.from_dict(data, orient="index")
     if sort_by_gdp:
-        dct = county_gdp_per_capita()
+        dct = country_gdp_per_capita()
         df["gdp"] = np.vectorize(dct.get)(df["iso3"].values, np.nan)
         mask = np.isfinite(df["gdp"])
         df = pd.concat([
@@ -401,8 +401,8 @@ def iso_codes():
     Get list of all US states (2-letter) and countries (3-letter) codes
     """
     codes = list(gc.get_us_states().keys())
-    codes = codes + list(county_gdp_per_capita().keys())
-    codes = codes + list(set(county_population().keys()) - set(codes))
+    codes = codes + list(country_gdp_per_capita().keys())
+    codes = codes + list(set(country_population().keys()) - set(codes))
     return codes
 
 
@@ -425,7 +425,7 @@ def geonamescache_to_dictionary(func):
 
 
 @geonamescache_to_dictionary
-def county_gdp_per_capita():
+def country_gdp_per_capita():
     """
     Get dictionary of GDP per capita for country codes (based on "geopandas")
     """
@@ -438,7 +438,7 @@ def county_gdp_per_capita():
 
 
 @geonamescache_to_dictionary
-def county_population():
+def country_population():
     """
     Get dictionary of population for country codes (based on "geonamescache")
     """
