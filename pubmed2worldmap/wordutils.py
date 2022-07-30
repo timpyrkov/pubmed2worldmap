@@ -2,7 +2,6 @@
 # -*- coding: utf8 -*-
 
 import os
-import string
 import warnings
 import numpy as np
 import pandas as pd
@@ -97,8 +96,8 @@ class KeyWordParser():
         List of all texts to calculate baseline word frequencies
         Otherwise use word frequency in english language as the baseline
     extended : bool, default False
-        If False - match words to stems; If True - use extended search of close matches 
-        based on "difflib", works slowly, can be initialized by pre-calculated dictionary
+        If False - match words to stems; If True - find close matches using "difflib"
+        (works slowly, speed-up by providing pre-calculated dictionary as "word_forms")
     word_forms : dict or None, default None
         Use pre-calculated dictionary of close matches to common word forms
 
@@ -113,7 +112,7 @@ class KeyWordParser():
 
     """
     def __init__(self, texts=None, extended=False, word_forms=None):
-        self.lemmatizer = WordLemmatizer(word_forms=word_forms, extended=extended)
+        self.lemmatizer = WordLemmatizer(extended=extended, word_forms=word_forms)
         self.stoplist = ["university", "institute", "center", "department", 
                          "laboratory", "faculty", "research", "national", "unit"]
         if hasattr(self.lemmatizer, "stoplist"):
@@ -126,7 +125,7 @@ class KeyWordParser():
 
     def texts_to_lemmas(self, texts):
         """
-        Convert text to list of word stems (or common word form, if extended == True)
+        Convert text to list of common word forms
         """
         words = self.texts_to_words(texts)
         words = [self.lemmatizer.lemmatize(w) for w in words]
@@ -231,8 +230,8 @@ class WordLemmatizer():
         List of all texts to calculate baseline word frequencies
         Otherwise use word frequency in english language as the baseline
     extended : bool, default False
-        If False - match words to stems; If True - use extended search of close matches 
-        based on "difflib", works slowly, can be initialized by pre-calculated dictionary
+        If False - match words to stems; If True - find close matches using "difflib"
+        (works slowly, speed-up by providing pre-calculated dictionary as "word_forms")
     word_forms : dict or None, default None
         Use pre-calculated dictionary of close matches to common word forms
 
@@ -246,7 +245,6 @@ class WordLemmatizer():
         List of words to skip stemmer
 
     """
-
     def __init__(self, texts=None, extended=False, word_forms=None):
         self.extended = extended
         # https://dictionary.cambridge.org/grammar/british-grammar/word-formation/prefixes
@@ -308,7 +306,8 @@ class WordLemmatizer():
                 df = pd.read_csv(word_forms, delimiter=";", index_col=0, keep_default_na=False)
                 self.word_forms = df[df.columns[0]].to_dict()
             elif texts is not None:
-                word_freq = KeyWordParser(texts).baseline_freq
+                words = KeyWordParser.texts_to_words(texts)
+                word_freq = KeyWordParser.word_freq(words)
                 words = np.array(list(word_freq.keys()))
                 freqs = np.array(list(word_freq.values()))
                 mask = [w not in self.stoplist for w in words]
@@ -341,6 +340,9 @@ class WordLemmatizer():
                     df.columns = ["WORD"]
                     df.index.name = "FORM"
                     df.to_csv(word_forms, sep=";")
+            else:
+                msg = f"Failed to initialize word forms dictionary: texts={texts}, word_forms={word_forms}"
+                warnings.warn(msg, UserWarning, stacklevel=2)
         words = list(dict.fromkeys(list(self.word_forms.values())))
         self.word_roots = {self.full_stemmer(w): w for w in words}
 
@@ -414,7 +416,7 @@ class WordLemmatizer():
 
     def lemmatize(self, word):
         """
-        Get word root (stem / most common form) 
+        Get the most common form of a word
         """
         w = word.lower()
         if w not in self.word_forms:

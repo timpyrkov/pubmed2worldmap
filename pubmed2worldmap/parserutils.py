@@ -582,7 +582,7 @@ def cluster_topics(s, extended=False, nmaxclust=100):
     texts = [" ".join(t.split()[:5]) for t in texts]
     texts = texts + list(s.pmid_title.values())
     texts = texts + list(s.pmid_abstract.values())
-    word_forms = "wordform.csv" if extended else None 
+    word_forms = "wordform.csv" if extended else None
     lemmatizer = WordLemmatizer(texts, word_forms=word_forms, extended=extended)
     s.word_forms = lemmatizer.word_forms
     """ Cluster keywords """
@@ -726,15 +726,15 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0):
         Min year cutoff
 
     """
-    topic_teams, topic_pmids, _ = topic_summary(s, topic, min_year)
+    topic_teams, topic_pmids, topic_keywords = topic_summary(s, topic, min_year)
     if not os.path.exists(folder):
         os.makedirs(folder)
-    fname = "_".join(keywords[:3])
-    fname = f"{folder}/{topic_id:02d}_{fname}.html"
+    fname = "_".join(topic_keywords[:3])
+    fname = f"{folder}/{topic:02d}_{fname}.html"
     f = open(fname, "w+")
     for t, pmids in topic_teams.items():
         pmids_ = [p for p in pmids if p in topic_pmids]
-        summary = team_summary(s, t, pmids=pmids_, keywords=keywords, 
+        summary = team_summary(s, t, pmids=pmids_, keywords=topic_keywords, 
             min_year=min_year, max_affs=1, max_authors=2, show_emails=False)
         f.write(summary)
     f.close()

@@ -9,6 +9,10 @@
 - Plot world map by country/US state (`geoutils.py`, `geopandas`)
 - Keywords extraction (`wordutils.py`, `wordfreq`, `wordcloud`, `difflib`, `nltk`)
 
+# Quick start
+1. Install dependencies: `pip install -r requirements.txt`
+2. Run jupyter and launch `example.ipynb`
+
 # Scrape PubMed
 ```
 import sys
