@@ -691,7 +691,8 @@ def topic_summary(s, topic, min_year=0, abstract=False, review=False):
             warnings.warn(msg, UserWarning, stacklevel=2)
             return
     """ Update PMID keywords if needed """
-    new_keywords = [k for k in keywords if k not in s.top_keywords]
+    known_keywords = list(s.keyword_abstracts.keys())
+    new_keywords = [k for k in keywords if k not in known_keywords]
     if len(new_keywords) > 0:
         update_pmid_keywords(s, new_keywords)
     """ Assign topic pmids """
