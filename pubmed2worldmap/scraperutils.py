@@ -203,8 +203,9 @@ class PubMedScraper():
         self.pmid_affs = {}
         self.pmid_year = {}
         self.pmid_title = {}
-        self.pmid_abstract = {}
+        self.pmid_review = {}
         self.pmid_authors = {}
+        self.pmid_abstract = {}
         self.author_name = {}
         self.author_affs = {}
         self.author_pmids = {}
@@ -213,6 +214,7 @@ class PubMedScraper():
         for pmid in tqdm(self.pmids, desc="Parse pmid data"):
             full_author = ""
             author = ""
+            review = 0
             year = 0
             title = ""
             abstract = ""
@@ -241,6 +243,9 @@ class PubMedScraper():
                 # MESH terms
                 if w[0] == "MH":
                     mesh = mesh + ", " + " ".join(w[2:])
+                # Publication type
+                if w[0] == "PT" and line.lower().find("review") > 0:
+                    review = 1
                 # Full author name
                 if w[0] == "FAU":
                     full_author = " ".join(w[2:])
@@ -267,8 +272,9 @@ class PubMedScraper():
                 self.pmid_affs[pmid] = affs
                 self.pmid_year[pmid] = year
                 self.pmid_title[pmid] = title
-                self.pmid_abstract[pmid] = abstract
+                self.pmid_review[pmid] = review
                 self.pmid_authors[pmid] = authors
+                self.pmid_abstract[pmid] = abstract
                 # Store first and last author for each pmid
                 if len(authors) > 0:
                     update_dict(self.author_score, authors[0], 1)

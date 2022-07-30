@@ -412,21 +412,27 @@ def knee_point(linkage, plot=False):
     return x[i]
 
 
-def update_pmid_keywords(s, keywords, abstract=False):
+def update_pmid_keywords(s, keywords):
     """
     Utility function to assign/update keywords for PubMed ids
     """
     for pmid in s.pmids:
         text = s.pmid_title[pmid]
-        if abstract:
-            text = text + " " + s.pmid_abstract[pmid]
         _, keys = find_keywords(s, text, keywords)
-        pmid_keys = s.pmid_keywords[pmid]
+        title_keys = s.title_keywords[pmid]
         for k in keys:
-            if k not in pmid_keys:
-                pmid_keys.append(k)
-        s.pmid_keywords[pmid] = pmid_keys
-    s.keyword_pmids = keywords_to_items(s.pmid_keywords)
+            if k not in title_keys:
+                title_keys.append(k)
+        s.title_keywords[pmid] = title_keys
+        text = text + " " + s.pmid_abstract[pmid]
+        _, keys = find_keywords(s, text, keywords)
+        abstract_keys = s.abstract_keywords[pmid]
+        for k in keys:
+            if k not in abstract_keys:
+                abstract_keys.append(k)
+        s.abstract_keywords[pmid] = abstract_keys
+    s.keyword_titles = keywords_to_items(s.title_keywords)
+    s.keyword_abstracts = keywords_to_items(s.abstract_keywords)
     return
 
 
@@ -609,7 +615,8 @@ def cluster_topics(s, extended=False, nmaxclust=100):
         s.team_keywords[i] = s.team_keywords[i] + kwp.keywords(texts, nmax=10)
         s.team_keywords[i]  =list(np.unique(s.team_keywords[i]))
     """ Cluster topics by keywords """
-    s.pmid_keywords = {p: [] for p in s.pmids}
+    s.title_keywords = {p: [] for p in s.pmids}
+    s.abstract_keywords = {p: [] for p in s.pmids}
     keyword_clustering(s, nmaxclust=nmaxclust)
     return
 
@@ -668,7 +675,7 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
 
 
 
-def topic_summary(s, topic, min_year=0):
+def topic_summary(s, topic, min_year=0, abstract=False, review=False):
     """
     Utility function to calculate topic summary
     """
@@ -688,29 +695,37 @@ def topic_summary(s, topic, min_year=0):
     if len(new_keywords) > 0:
         update_pmid_keywords(s, new_keywords)
     """ Assign topic pmids """
-    topic_pmids = [s.keyword_pmids[k] for k in keywords if k in s.keyword_pmids]
+    topic_pmids = [s.keyword_titles[k] for k in keywords if k in s.keyword_titles]
+    if abstract:
+        topic_pmids = [s.keyword_abstracts[k] for k in keywords if k in s.keyword_abstracts]
     topic_pmids = list(itertools.chain(*topic_pmids))
     topic_pmids = sort_pmids_by_year(s, topic_pmids)
+    if review:
+        mask = np.array([s.pmid_review[p] for p in topic_pmids]) == 1
+        topic_pmids = np.array(topic_pmids)[mask]
     """ Assign topic teams """
-    topic_teams = {}
-    for t, pmids in s.team_pmids.items():
-        topic_teams[t] = [p for p in pmids if p in topic_pmids and s.pmid_year[p] >= min_year]
-    topic_teams = sort_dict(topic_teams)
-    duplicates = []
-    for t, pmids in topic_teams.items():
-        pmids_ = [p for p in pmids if p not in duplicates]
-        duplicates = duplicates + pmids_
-        topic_teams[t] = pmids_
-    topic_teams = sort_dict(topic_teams)
     topic_keywords = []
-    for t in topic_teams:
-        for key in s.team_keywords[t]:
-            if key in keywords:
-                topic_keywords.append(key)
+    topic_teams = {}
+    if len(topic_pmids) > 0:
+        for t, pmids in s.team_pmids.items():
+            topic_teams[t] = [p for p in pmids if p in topic_pmids and s.pmid_year[p] >= min_year]
+        topic_teams = sort_dict(topic_teams)
+        duplicates = []
+        for t, pmids in topic_teams.items():
+            pmids_ = [p for p in pmids if p not in duplicates]
+            duplicates = duplicates + pmids_
+            topic_teams[t] = pmids_
+        topic_teams = sort_dict(topic_teams)
+        topic_keywords = []
+        for t in topic_teams:
+            for key in s.team_keywords[t]:
+                if key in keywords:
+                    topic_keywords.append(key)
     return topic_teams, topic_pmids, topic_keywords
 
 
-def topic_html(s, topic, folder="pubmed_summary", min_year=0):
+def topic_html(s, topic, folder="pubmed_summary", min_year=0, 
+               abstract=False, review=False):
     """"
     Save html topic summary
 
@@ -724,9 +739,18 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0):
         Output folder
     min_year : int, default 0
         Min year cutoff
+    abstract : bool, default False
+        If False - only output pmids with titles matching topic keywords.
+        If True - output pmids with titles or abstracts matching topic keywords.
+    review : bool, default False
+        If False - output all publications
+        If True - only output reviews
 
     """
-    topic_teams, topic_pmids, _ = topic_summary(s, topic, min_year)
+    topic_teams, topic_pmids, _ = topic_summary(s, topic, min_year, 
+                                                abstract=abstract, review=review)
+    if len(topic_pmids) == 0:
+        return
     topic_keywords = s.topic_keywords[topic]
     if not os.path.exists(folder):
         os.makedirs(folder)
