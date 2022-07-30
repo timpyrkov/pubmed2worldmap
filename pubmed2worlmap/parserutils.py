@@ -26,14 +26,17 @@ year, title, author names, affiliations from PubMed format data files.
 
 
 
-def parse_geo_data(s, path):
+def parse_geo_data(s, path=None):
     """
     Parse geographic names (city, country/US state) from author affiliations
 
     Parameters
     ----------
-    path : str
-        Folder with downloaded PubMed format data files
+    s : class object
+        PubMedScraper() instance object
+    path : str or None, default None
+        Folder to store "geopandas" maps and 
+        "geonamescahce" data
 
     Returns
     -------
@@ -42,8 +45,7 @@ def parse_geo_data(s, path):
         (can be used to show world map by "geopandas")
 
     """
-    # Make
-    #  affs dictionary and parse geo data
+    # Make affs dictionary and parse geo data
     affs = list(s.author_affs.values())
     affs = list(itertools.chain(*affs))
     affs = np.unique(np.array(affs))
@@ -95,10 +97,10 @@ def npmid_by_country(s, start=None, end=None):
     Parameters
     ----------
     start : int or None, default None
-        Start (minimum) year
+       Min year cutoff
 
     end : int or None, default None
-        End (maximum) year
+        Max year cutoff
 
     Returns
     -------
@@ -688,7 +690,7 @@ def topic_summary(s, topic, min_year=0):
     """ Assign topic pmids """
     topic_pmids = [s.keyword_pmids[k] for k in keywords if k in s.keyword_pmids]
     topic_pmids = list(itertools.chain(*topic_pmids))
-    topic_pmids = s.sort_pmids_by_year(topic_pmids)
+    topic_pmids = sort_pmids_by_year(s, topic_pmids)
     """ Assign topic teams """
     topic_teams = {}
     for t, pmids in s.team_pmids.items():

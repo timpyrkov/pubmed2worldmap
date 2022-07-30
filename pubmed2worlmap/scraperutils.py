@@ -85,7 +85,7 @@ class PubMedScraper():
     Example
     -------
     >>> search_terms = "hydrothermal vents"
-    >>> s = PubMedScraper(search_terms, folder="pubmed", download=True)
+    >>> s = PubMedScraper(search_terms, folder="pubmed_download", download=True)
     >>> s.data.head()
 
     """

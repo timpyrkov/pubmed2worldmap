@@ -17,9 +17,9 @@ from scraperutils import PubMedScraper
 import nest_asyncio; nest_asyncio.apply() # need this to run asyncio in jupyter notebooks
 
 
-# Let us download search results for "hydrothermal vents" to folder "pubmed"
+# Let us download search results for "hydrothermal vents" to folder "pubmed_download"
 search_terms = "hydrothermal vents"
-s = PubMedScraper(search_terms, folder="pubmed", download=True)
+s = PubMedScraper(search_terms, folder="pubmed_download", download=True)
 
 # Get pandas DataFrame with year, pmid, and title of all search results 
 s.data.head()
