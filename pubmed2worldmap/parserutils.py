@@ -675,7 +675,7 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
 
 
 
-def topic_summary(s, topic, min_year=0, abstract=False, review=False):
+def topic_summary(s, topic, min_year=0, abstract=False, review=False, logical_and=False):
     """
     Utility function to calculate topic summary
     """
@@ -695,11 +695,13 @@ def topic_summary(s, topic, min_year=0, abstract=False, review=False):
     if len(new_keywords) > 0:
         update_pmid_keywords(s, new_keywords)
     """ Assign topic pmids """
-    topic_pmids = [s.keyword_titles[k] for k in keywords if k in s.keyword_titles]
-    if abstract:
-        topic_pmids = [s.keyword_abstracts[k] for k in keywords if k in s.keyword_abstracts]
+    keyword_pmids = s.keyword_abstracts if abstract else s.keyword_titles
+    dct = {k: keyword_pmids[k] for k in keywords if k in keyword_pmids}
+    topic_pmids = list(dct.values())
     topic_pmids = list(itertools.chain(*topic_pmids))
     topic_pmids = sort_pmids_by_year(s, topic_pmids)
+    if logical_and:
+        topic_pmids = [p for p in topic_pmids if all([p in dct[k] for k in dct])]
     if review:
         mask = np.array([s.pmid_review[p] for p in topic_pmids]) == 1
         topic_pmids = np.array(topic_pmids)[mask]
@@ -725,7 +727,7 @@ def topic_summary(s, topic, min_year=0, abstract=False, review=False):
 
 
 def topic_html(s, topic, folder="pubmed_summary", min_year=0, 
-               abstract=False, review=False):
+               abstract=False, review=False, logical_and=False):
     """"
     Save html topic summary
 
@@ -747,24 +749,25 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0,
         If True - only output reviews
 
     """
-    topic_teams, topic_pmids, topic_keywords = topic_summary(s, topic, min_year, 
-                                                abstract=abstract, review=review)
-    if len(topic_pmids) == 0:
+    teams, _, keywords = topic_summary(s, topic, min_year, abstract=abstract,
+                                       review=review, logical_and=logical_and)
+    if len(teams) == 0:
         return
     if isinstance(topic, (int, np.int64)):
-        topic_keywords = s.topic_keywords[topic]
+        keywords = s.topic_keywords[topic]
     else:
         topic = 0
-        topic_keywords = np.unique(np.array(topic_keywords))
+        keywords = np.unique(np.array(keywords))
     if not os.path.exists(folder):
         os.makedirs(folder)
-    fname = "_".join(topic_keywords[:3])
+    fname = "_".join(keywords[:3])
     fname = f"{folder}/{topic:02d}_{fname}.html"
+    print(f"{sum([len(teams[t]) for t in teams]):4d}  {fname}")
     f = open(fname, "w+")
-    for team, pmids in topic_teams.items():
-        pmids_ = [p for p in pmids if p in topic_pmids]
-        summary = team_summary(s, team, pmids=pmids_, keywords=topic_keywords, 
-            min_year=min_year, max_affs=1, max_authors=2, show_emails=False)
+    for team, pmids in teams.items():
+        summary = team_summary(s, team, pmids=pmids, keywords=keywords, 
+                               min_year=min_year, max_affs=1, 
+                               max_authors=2, show_emails=False)
         f.write(summary)
     f.close()
     return
@@ -784,9 +787,9 @@ def topic_wordcloud(s, topic, min_year=0):
         Min year cutoff
 
     """
-    _, _, topic_keywords = topic_summary(s, topic, min_year)
+    _, _, keywords = topic_summary(s, topic, min_year)
     print(f"Topic #{topic} keywords cloud")
-    keywords_wordcloud(topic_keywords)
+    keywords_wordcloud(keywords)
     return
 
 
