@@ -680,17 +680,16 @@ def topic_summary(s, topic, min_year=0, abstract=False, review=False):
     Utility function to calculate topic summary
     """
     assert isinstance(topic, (list, int, np.int64))
-    topic_id = 0
     keywords = topic
     if isinstance(topic, (int, np.int64)):
         if topic in s.topic_keywords:
-            topic_id = topic
             keywords = s.topic_keywords[topic]
         else:
             msg = f"Wrong topic id {topic}"
             warnings.warn(msg, UserWarning, stacklevel=2)
             return
     """ Update PMID keywords if needed """
+    keywords = [k.lower() for k in keywords]
     known_keywords = list(s.keyword_abstracts.keys())
     new_keywords = [k for k in keywords if k not in known_keywords]
     if len(new_keywords) > 0:
@@ -748,11 +747,15 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0,
         If True - only output reviews
 
     """
-    topic_teams, topic_pmids, _ = topic_summary(s, topic, min_year, 
+    topic_teams, topic_pmids, topic_keywords = topic_summary(s, topic, min_year, 
                                                 abstract=abstract, review=review)
     if len(topic_pmids) == 0:
         return
-    topic_keywords = s.topic_keywords[topic]
+    if isinstance(topic, (int, np.int64)):
+        topic_keywords = s.topic_keywords[topic]
+    else:
+        topic = 0
+        topic_keywords = np.unique(np.array(topic_keywords))
     if not os.path.exists(folder):
         os.makedirs(folder)
     fname = "_".join(topic_keywords[:3])
