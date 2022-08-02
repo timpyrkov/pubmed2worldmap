@@ -500,7 +500,7 @@ def keyword_clustering(s, nmaxclust=100):
     return
 
 
-def get_contry_authors(s, country=None):
+def get_country_authors(s, country=None):
     """
     Utility function to get author list by country code/US state
     """
@@ -547,7 +547,7 @@ def cluster_topics(s, extended=False, nmaxclust=100):
     s.team_city = {}
     s.team_country = {}
     s.city_teams = {}
-    country_auths = get_contry_authors(s)
+    country_auths = get_country_authors(s)
     for country in tqdm(country_auths, desc="Cluster authors"):
         author_score = {a: s.author_score[a] for a in country_auths[country]} 
         author_score = sort_dict(author_score)
@@ -561,26 +561,33 @@ def cluster_topics(s, extended=False, nmaxclust=100):
         city_list = list(item_id_dict(auths, s.author_cities).keys())
         idx = density_clustering(auths, s.author_pmids, density=scores,
                                  mask=[s.author_cities, s.author_affs])
+        idxs = np.unique(idx)
         team_city = {}
+        team_pmids = {}
         team_authors = {}
-        for i in range(1,idx.max()+1):
+        for i in idxs:
             mask = idx == i
             team_authors[i] = list(auths[mask])
             team_city[i] = list(item_id_dict(auths[mask], s.author_cities).keys())[0]
+            pmids = list(item_id_dict(team_authors[i], s.author_pmids).keys())
+            team_pmids[i] = sort_pmids_by_year(s, pmids)
+        # Sort teams by number of publications
+        idx = np.array([len(team_pmids[i]) for i in idxs])
+        idx = np.argsort(idx)[::-1]
         # Assign team data
         team_id = max(list(s.team_authors.keys())) if len(s.team_authors) > 0 else 0
         for city in city_list:
             city_teams = []
-            for i, auths in team_authors.items():
+            for i in idx:
                 if team_city[i] == city:
                     team_id += 1
+                    auths = team_authors[i]
                     city_teams.append(team_id)
                     s.team_city[team_id] = city
                     s.team_country[team_id] = country
                     s.team_authors[team_id] = auths
                     s.team_affs[team_id] = list(item_id_dict(auths, s.author_affs).keys())
-                    pmids = list(item_id_dict(auths, s.author_pmids).keys())
-                    s.team_pmids[team_id] = sort_pmids_by_year(s, pmids)
+                    s.team_pmids[team_id] = team_pmids[i]
             s.city_teams[(country, city)] = city_teams
     """ Collect word forms """
     texts = list(s.pmid_affs.values())
@@ -640,7 +647,7 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
         loc = geoutils.state_code_to_name(s.team_country[t])
     loc = f"[{s.team_city[t]}, {loc}]"
     for i, aff in enumerate(s.team_affs[t][:max_affs]):
-        aff_, _ = find_keywords(s, aff, s.top_keywords)
+        aff_, _ = find_keywords(s, aff, keywords)
         if i == 0:
             summary = summary + f"<i>{aff_} {loc}</i><br>\n"
         else:
@@ -648,8 +655,7 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
     for i, pmid in enumerate(pmids):
         year = s.pmid_year[pmid]
         if i < max_pmids and year >= min_year:
-            title, _ = find_keywords(s, s.pmid_title[pmid], s.top_keywords)
-            #title = s.pmid_title[pmid]
+            title, _ = find_keywords(s, s.pmid_title[pmid], keywords)
             link = f"<a href='https://pubmed.ncbi.nlm.nih.gov/{pmid}/'" \
             f"target='_blank' rel='noopener noreferrer'>{pmid}</a>"
             info = f"{s.pmid_year[pmid]} [PMID {link}] {title}"
@@ -728,7 +734,7 @@ def topic_summary(s, topic, min_year=0, abstract=False, review=False, logical_an
 
 def topic_html(s, topic, folder="pubmed_summary", min_year=0, 
                abstract=False, review=False, logical_and=False):
-    """"
+    """
     Save html topic summary
 
     Parameters
@@ -765,7 +771,7 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0,
     print(f"{sum([len(teams[t]) for t in teams]):4d}  {fname}")
     f = open(fname, "w+")
     for team, pmids in teams.items():
-        summary = team_summary(s, team, pmids=pmids, keywords=keywords, 
+        summary = team_summary(s, team, pmids=pmids, keywords=s.top_keywords, 
                                min_year=min_year, max_affs=1, 
                                max_authors=2, show_emails=False)
         f.write(summary)

@@ -44,6 +44,8 @@ def find_keywords(s, text, keywords):
         List of keywords found in text
 
     """
+    if keywords is None:
+        keywords = s.top_keywords
     regex = re.compile('[^a-zA-Z]')
     words = text.split()
     text = []
