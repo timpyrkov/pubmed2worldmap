@@ -678,9 +678,6 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
     return summary
 
 
-
-
-
 def topic_summary(s, topic, min_year=0, abstract=False, review=False, logical_and=False):
     """
     Utility function to calculate topic summary
@@ -732,6 +729,26 @@ def topic_summary(s, topic, min_year=0, abstract=False, review=False, logical_an
     return topic_teams, topic_pmids, topic_keywords
 
 
+def topic_wordcloud(s, topic, min_year=0):
+    """"
+    Show wordcloud of topic keywords
+
+    Parameters
+    ----------
+    s : class object
+        PubMedScraper() instance object
+    topic : int
+        Topic id (starts from zero)
+    min_year : int, default 0
+        Min year cutoff
+
+    """
+    _, _, keywords = topic_summary(s, topic, min_year)
+    print(f"Topic #{topic} keywords cloud")
+    keywords_wordcloud(keywords)
+    return
+
+
 def topic_html(s, topic, folder="pubmed_summary", min_year=0, 
                abstract=False, review=False, logical_and=False):
     """
@@ -779,29 +796,48 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0,
     return
 
 
-def topic_wordcloud(s, topic, min_year=0):
-    """"
-    Show wordcloud of topic keywords
+def country_html(s, country, folder="pubmed_country", min_year=0):
+    """
+    Save html country summary
 
     Parameters
     ----------
     s : class object
         PubMedScraper() instance object
-    topic : int
-        Topic id (starts from zero)
+    country : str
+        Country (iso3) or US state code
+    folder : str, default "pubmed_country"
+        Output folder
     min_year : int, default 0
         Min year cutoff
 
     """
-    _, _, keywords = topic_summary(s, topic, min_year)
-    print(f"Topic #{topic} keywords cloud")
-    keywords_wordcloud(keywords)
+    dct = geoutils.country_code_to_name()
+    dct.update(geoutils.state_code_to_name())
+    codes = country if isinstance(country, list) else [country]
+    duplicates = []
+    city = ""
+    summary = ""
+    for t, code in s.team_country.items():
+        if code in codes:
+            pmids = [p for p in s.team_pmids[t] if p not in duplicates]
+            if len(pmids) > 0:
+                duplicates = duplicates + pmids
+                if s.team_city[t] != city:
+                    city = s.team_city[t]
+                    prefix = f"{city.upper()} ({dct[code]}) " + "#" * 20
+                    prefix = "<b>" + prefix + "#" * (120 - len(prefix)) + "</b><br><br>"
+                    summary = summary + prefix
+                summary_ = team_summary(s, t, pmids=pmids, min_year=min_year)
+                summary = summary + summary_
+    if len(summary) > 0:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        fname = f"{folder}/{codes[0]}.html"
+        f = open(fname, "w+")
+        f.write(summary)
+        f.close()
     return
-
-
-
-
-
 
 
 
