@@ -787,11 +787,52 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0,
     fname = f"{folder}/{topic:02d}_{fname}.html"
     print(f"{sum([len(teams[t]) for t in teams]):4d}  {fname}")
     f = open(fname, "w+")
+    header = "<!DOCTYPE html>\n<html>\n<head>\n"
+    header = header + f"<title>{s.search_terms.upper()}: [{', '.join(keywords)}]</title>\n"
+    header = header + "<style>p {font-size: 1.2em;}</style>\n"
+    header = header + "<style>body {font-family: Arial, sans-serif;}</style>\n"
+    header = header + f"</head>\n<body>\n\n<h2>{s.search_terms.upper()}: [{', '.join(keywords)}]</h2>"
+    footer = "\n</body>\n</html>\n"
+    f.write(header)
     for team, pmids in teams.items():
         summary = team_summary(s, team, pmids=pmids, keywords=s.top_keywords, 
                                min_year=min_year, max_affs=1, 
                                max_authors=2, show_emails=False)
         f.write(summary)
+    f.write(footer)
+    f.close()
+    return
+
+
+def topic_toc(s, folder="pubmed_summary"):
+    """
+    Save html topic Table of Contents
+
+    Parameters
+    ----------
+    s : class object
+        PubMedScraper() instance object
+    folder : str, default "pubmed_summary"
+        Output folder
+
+    """
+    fnamelist = sorted(os.listdir(folder))
+    fnamedict = {int(f.split("_")[0]): f for f in fnamelist if f.find("_") > 0}
+    header = "<!DOCTYPE html>\n<html>\n<head>\n"
+    header = header + f"<title>Pubmed search results on: {s.search_terms.upper()}</title>\n"
+    header = header + "<style>p {font-size: 1.2em;}</style>\n"
+    header = header + "<style>body {font-family: Arial, sans-serif;}</style>\n"
+    header = header + f"</head>\n<body>\n\n<h2>Pubmed search results on: {s.search_terms.upper()}</h2>\n"
+    footer = "\n</body>\n</html>\n"
+    body = ""
+    for t in list(s.topic_keywords.keys()):
+        item = f"{t:02d} [{', '.join(s.topic_keywords[t])}]"
+        item = f"<p><a href='{fnamedict[t]}'target='_blank' rel='noopener noreferrer'>{item}</a></p>\n"
+        body = body + item
+    f = open(folder+"/index.html", "w+")
+    f.write(header)
+    f.write(body)
+    f.write(footer)
     f.close()
     return
 
