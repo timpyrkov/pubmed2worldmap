@@ -675,6 +675,8 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
             summary = summary + f"{s.author_name[a]}<br>\n"
             count_author += 1
     summary = summary + "<br>\n<br>\n"
+    if count_author == 0:
+        summary = ""
     return summary
 
 
@@ -796,7 +798,8 @@ def topic_html(s, topic, min_year=0, abstract=False, review=False, logical_and=F
         summary = team_summary(s, team, pmids=pmids, keywords=s.top_keywords, 
                                min_year=min_year, max_affs=1, 
                                max_authors=2, show_emails=False)
-        f.write(summary)
+        if len(summary) > 0:
+            f.write(summary)
     f.write(footer)
     f.close()
     return
@@ -866,7 +869,8 @@ def country_html(s, country, min_year=0):
                     prefix = "<b>" + prefix + "#" * (120 - len(prefix)) + "</b><br><br>"
                     summary = summary + prefix
                 summary_ = team_summary(s, t, pmids=pmids, min_year=min_year)
-                summary = summary + summary_
+                if len(summary_) > 0:
+                    summary = summary + summary_
     if len(summary) > 0:
         if not os.path.exists(folder):
             os.makedirs(folder)
