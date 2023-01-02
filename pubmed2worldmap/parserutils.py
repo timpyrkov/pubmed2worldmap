@@ -595,7 +595,7 @@ def cluster_topics(s, extended=False, nmaxclust=100):
     texts = [" ".join(t.split()[:5]) for t in texts]
     texts = texts + list(s.pmid_title.values())
     texts = texts + list(s.pmid_abstract.values())
-    word_forms = "wordform.csv" if extended else None
+    word_forms = s.folder + "wordform.csv" if extended else None
     lemmatizer = WordLemmatizer(texts, word_forms=word_forms, extended=extended)
     s.word_forms = lemmatizer.word_forms
     """ Cluster keywords """
@@ -663,7 +663,7 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
     count_author = 0
     for a in s.team_authors[t]:
         email = s.author_email[a]
-        if s.author_score[a] > 0 and len(email) > 0 and count_author < max_authors:
+        if s.author_score[a] > 1 and len(email) > 0 and count_author < max_authors:
             if show_emails:
                 summary = summary + f"{s.author_name[a]}   [{email[0]}]<br>\n"
             else:
@@ -671,7 +671,7 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
             count_author += 1
     for a in s.team_authors[t]:
         email = s.author_email[a]
-        if s.author_score[a] > 0 and len(email) == 0 and count_author < max_authors:
+        if s.author_score[a] > 1 and len(email) == 0 and count_author < max_authors:
             summary = summary + f"{s.author_name[a]}<br>\n"
             count_author += 1
     summary = summary + "<br>\n<br>\n"
@@ -749,8 +749,7 @@ def topic_wordcloud(s, topic, min_year=0):
     return
 
 
-def topic_html(s, topic, folder="pubmed_summary", min_year=0, 
-               abstract=False, review=False, logical_and=False):
+def topic_html(s, topic, min_year=0, abstract=False, review=False, logical_and=False):
     """
     Save html topic summary
 
@@ -760,8 +759,6 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0,
         PubMedScraper() instance object
     topic : int
         Topic id (starts from zero)
-    folder : str, default "pubmed_summary"
-        Output folder
     min_year : int, default 0
         Min year cutoff
     abstract : bool, default False
@@ -772,6 +769,7 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0,
         If True - only output reviews
 
     """
+    folder = s.folder + "/review)summary/" if review else s.folder + "/topic_summary/"
     teams, _, keywords = topic_summary(s, topic, min_year, abstract=abstract,
                                        review=review, logical_and=logical_and)
     if len(teams) == 0:
@@ -804,7 +802,7 @@ def topic_html(s, topic, folder="pubmed_summary", min_year=0,
     return
 
 
-def topic_toc(s, folder="pubmed_summary"):
+def topic_toc(s):
     """
     Save html topic Table of Contents
 
@@ -812,10 +810,9 @@ def topic_toc(s, folder="pubmed_summary"):
     ----------
     s : class object
         PubMedScraper() instance object
-    folder : str, default "pubmed_summary"
-        Output folder
 
     """
+    folder = s.folder + "/topic_summary/"
     fnamelist = sorted(os.listdir(folder))
     fnamedict = {int(f.split("_")[0]): f for f in fnamelist if f.find("_") > 0}
     header = "<!DOCTYPE html>\n<html>\n<head>\n"
@@ -837,7 +834,7 @@ def topic_toc(s, folder="pubmed_summary"):
     return
 
 
-def country_html(s, country, folder="pubmed_country", min_year=0):
+def country_html(s, country, min_year=0):
     """
     Save html country summary
 
@@ -847,12 +844,11 @@ def country_html(s, country, folder="pubmed_country", min_year=0):
         PubMedScraper() instance object
     country : str
         Country (iso3) or US state code
-    folder : str, default "pubmed_country"
-        Output folder
     min_year : int, default 0
         Min year cutoff
 
     """
+    folder = s.folder + "/country_summary/"
     dct = geoutils.country_code_to_name()
     dct.update(geoutils.state_code_to_name())
     codes = country if isinstance(country, list) else [country]

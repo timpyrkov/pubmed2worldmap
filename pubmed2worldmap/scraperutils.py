@@ -41,11 +41,6 @@ class PubMedScraper():
     ----------
     search_terms : str
         Search terms, e.g. "hydrothermal vents"
-    folder : str, default "pubmed_download"
-        Folder to download PubMed format data files (if download == True)
-    download : bool, default False
-        Flag to download PubMed format data files (requires ~5Mb per 1K records)
-        By default flag is False and only gets list of PubMed record id
     semaphore : int, default 10
         Limit for number of requests per time: Higher is faster, but if too high, 
         PubMed will return error code (PubMedScraper() will print warning message)
@@ -59,57 +54,54 @@ class PubMedScraper():
     pmids : ndarray
         List of PubMed id
     data : DataFrame
-        DataFrame with year, pmid, and title of all search results (if download == True)
+        DataFrame with year, pmid, and title of all search results
     pmid_affs : dict
-        Dictionary of affiliations for PubMed id (if download == True)
+        Dictionary of affiliations for PubMed id
     pmid_year : dict
-        Dictionary of year for PubMed id (if download == True)
+        Dictionary of year for PubMed id
     pmid_title : dict
-        Dictionary of title for PubMed id (if download == True)
+        Dictionary of title for PubMed id
     pmid_abstract : dict
-        Dictionary of abstract for PubMed id (if download == True)
+        Dictionary of abstract for PubMed id
     pmid_authors : dict
-        Dictionary of author names for PubMed id (if download == True)
+        Dictionary of author names for PubMed id
     author_name : dict
-        Dictionary of full author name for author name id (if download == True)
+        Dictionary of full author name for author name id
     author_affs : dict
-        Dictionary of affiliations for author name id (if download == True)
+        Dictionary of affiliations for author name id
     author_pmids : dict
-        Dictionary of PubMed ids for author name id (if download == True)
+        Dictionary of PubMed ids for author name id
     author_email : dict
-        Dictionary of email for author name id (if download == True)
+        Dictionary of email for author name id
     author_score : dict
-        Dictionary of author score for author name id (if download == True)
+        Dictionary of author score for author name id
         Score = Num first author + Num last author + 1 if has emails
 
     Example
     -------
-    >>> search_terms = "hydrothermal vents"
-    >>> s = PubMedScraper(search_terms, folder="pubmed_download", download=True)
+    >>> s = PubMedScraper("hydrothermal vents")
     >>> s.data.head()
 
     """
-    def __init__(self, search_terms, folder="pubmed_download", 
-                 download=False, semaphore=10, animal=True, plant=True):
-        self.folder = folder
+    def __init__(self, search_terms, semaphore=10, animal=True, plant=True):
+        self.folder = "_".join(search_terms.lower().split()) + "/"
+        self.download = self.folder + "/download/"
         self.search_terms = search_terms
-        self.download = download
         self.semaphore = semaphore
         self.animal = animal
         self.plant = plant
-        # 1) If folder dies not exist - scrape PubMed website, two options:
-        # a) If download is False - scrape only pmid list (low traffic, no pmid data)
-        # b) Else - create folder and save separate pmid .txt files (~500Mb / 100_000 records)
-        if not os.path.exists(folder):
+        # Look up for folder "_".join(search_terms.lower()split()) + "/download/"
+        # If folder does not exist - scrape PubMed website
+        if not os.path.exists(self.download):
             print("SCRAPING WEBSITE")
-            if download:
-                os.makedirs(folder)
+            if not os.path.exists(self.download):
+                os.makedirs(self.download)
             asyncio.run(self.scrape_pmids())
             self.data = pd.DataFrame(index=pd.Index(self.pmids, name='pmid'))
-        # 2) If folder exists (created right now, or before) - parse pmids .ttx files
-        if os.path.exists(folder):
+        # If folder exists (created right now, or before) - parse pmids .txt files
+        if os.path.exists(self.download):
             print("READING FOLDER")
-            self.pmids = np.array([f.split(".")[0] for f in os.listdir(folder)])
+            self.pmids = np.array([f.split(".")[0] for f in os.listdir(self.download)])
             self.data = self.parse_pmid_data()
 
 
@@ -138,16 +130,15 @@ class PubMedScraper():
         soup = BeautifulSoup(requests.get(url).content, features="html.parser")
         npage = extract_num_pages(soup)
         # Generate all output urls to parse search results page-by-page
-        fmt = "pubmed" if self.download else "pmid"
         if npage <= 50:
-            urls = [f"{url}&format={fmt}&page={i+1}" for i in range(min(npage,50))]
+            urls = [f"{url}&format=pubmed&page={i+1}" for i in range(min(npage,50))]
         else:
             # If "50 pages" limit exceeded - try to scrape timeline year by year
             timeline = extract_timeline(soup)
             urls = []
             for y, n in timeline.items():
                 for i in range(n):
-                    urls.append(f"{url}&filter=years.{y}-{y}&format={fmt}&page={i+1}")
+                    urls.append(f"{url}&filter=years.{y}-{y}&format=pubmed&page={i+1}")
         # Asynchronously fetch pmids data from list of urls
         semaphore = asyncio.BoundedSemaphore(self.semaphore)
         tasks = []
@@ -156,6 +147,7 @@ class PubMedScraper():
         pmids = await asyncio.gather(*tasks)
         pmids = list(itertools.chain(*pmids))
         self.pmids = np.unique(np.array(pmids))[::-1]
+        print("DEBUG", len(self.pmids))
         return
 
 
@@ -171,7 +163,7 @@ class PubMedScraper():
                     pmids.append(pmid)
                     if i > 0:
                         fout.close()
-                    fout = open(f"{self.folder}/{pmid}.txt", "w+")
+                    fout = open(f"{self.download}/{pmid}.txt", "w+")
                 fout.write(f"{line}\n")
             fout.close()
             return pmids
@@ -187,18 +179,18 @@ class PubMedScraper():
                     msg = f"Try to set lower semaphore: too many requests," + \
                     f"status {response.status} for {url}"
                     warnings.warn(msg, UserWarning, stacklevel=2)
-                # Parse pmids (and descriptions if download == True)
+                # Parse pmids and descriptions
                 soup = BeautifulSoup(data, features="html.parser")
                 e = soup.find("pre", {"class": "search-results-chunk"})
                 pmids = e.get_text().split("\r\n") if e is not None else []
-                if self.download and len(pmids) > 0:
+                if len(pmids) > 0:
                     pmids = split_files(pmids)
         return pmids
 
 
     def parse_pmid_data(self):
         """
-        Read and parse year, title, author names, affiliations (if download == True)
+        Read and parse year, title, author names, affiliations
         """
         self.pmid_affs = {}
         self.pmid_year = {}
@@ -221,7 +213,7 @@ class PubMedScraper():
             authors = []
             mesh = ""
             # Read and parse pmids .txt one by one
-            desc = read_pmid_txt(f"{self.folder}/{pmid}.txt")
+            desc = read_pmid_txt(f"{self.download}/{pmid}.txt")
             if not self.species_filter(desc):
                 continue
             for line in desc:
@@ -286,7 +278,7 @@ class PubMedScraper():
             if len(self.author_email[a]) > 0:
                 self.author_email[a] = [Counter(self.author_email[a]).most_common(1)[0][0]]
             self.author_name[a] = select_author_name(self.author_name[a])
-            score = int(len(self.author_email[a]) > 0)
+            score = int(len(self.author_pmids[a])) + int(len(self.author_email[a]) > 0)
             if a in self.author_score:
                 score += sum(self.author_score[a])
             self.author_score[a] = score
