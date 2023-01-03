@@ -858,19 +858,28 @@ def country_html(s, country, min_year=0):
     duplicates = []
     city = ""
     summary = ""
+    city_summary = ""
+    city_team_count = 0
     for t, code in s.team_country.items():
         if code in codes:
             pmids = [p for p in s.team_pmids[t] if p not in duplicates]
             if len(pmids) > 0:
                 duplicates = duplicates + pmids
                 if s.team_city[t] != city:
+                    if city_team_count:
+                        summary = summary + city_summary
+                    city_summary = ""
+                    city_team_count = 0
                     city = s.team_city[t]
                     prefix = f"{city.upper()} ({dct[code]}) " + "#" * 20
                     prefix = "<b>" + prefix + "#" * (120 - len(prefix)) + "</b><br><br>"
-                    summary = summary + prefix
+                    city_summary = city_summary + prefix
                 summary_ = team_summary(s, t, pmids=pmids, min_year=min_year)
                 if len(summary_) > 0:
-                    summary = summary + summary_
+                    city_summary = city_summary + summary_
+                    city_team_count += 1
+    if city_team_count:
+        summary = summary + city_summary
     if len(summary) > 0:
         if not os.path.exists(folder):
             os.makedirs(folder)
