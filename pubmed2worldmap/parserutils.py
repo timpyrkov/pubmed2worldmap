@@ -680,6 +680,52 @@ def team_summary(s, t, pmids=None, keywords=None, min_year=0,
     return summary
 
 
+def author_summary(s, a, pmids=None, keywords=None, min_year=0,
+                 max_affs=3, max_authors=5, max_pmids=50, show_emails=True):
+    """"
+    Utility function to make a team summary in html format
+    """
+    if pmids is None:
+        pmids = s.author_pmids[a]
+    pmids = np.array(pmids)
+    years = np.array([s.pmid_year[p] for p in pmids])
+    mask = years >= min_year
+    pmids = pmids[mask]
+    summary = ""
+    if len(pmids) == 0:
+        return summary
+    loc = geoutils.country_code_to_name(s.author_country[a])
+    if loc is None:
+        loc = geoutils.state_code_to_name(s.author_country[a])
+    loc = f"[{s.author_cities[a][0]}, {loc}]"
+    for i, aff in enumerate(s.author_affs[a][:max_affs]):
+        aff_, _ = find_keywords(s, aff, keywords)
+        if i == 0:
+            summary = summary + f"<i>{aff_} {loc}</i><br>\n"
+        else:
+            summary = summary + f"<i>{aff_}</i><br>\n"            
+    coauthors = [s.pmid_authors[pmid] for pmid in pmids]
+    coauthors = np.array(list(itertools.chain(*coauthors)))
+    coauthors = np.unique(coauthors, return_counts=True)
+    coauthors = sort_dict(dict(zip(*coauthors)))
+    if show_emails and len(s.author_email[a]) > 0:
+        summary = summary + f"{s.author_name[a]}   [{s.author_email[a][0]}]   ({len(pmids)})<br>\n"
+    else:
+        summary = summary + f"{s.author_name[a]}   ({len(pmids)})<br>\n"
+    count_author = 1
+    for coauthor, npmid in coauthors.items():
+        if coauthor != a and count_author < max_authors and s.author_score[a] >= s.author_score[coauthor]:
+            if show_emails and len(s.author_email[coauthor]) > 0:
+                summary = summary + f"{s.author_name[coauthor]}   [{s.author_email[coauthor][0]}]   ({npmid})<br>\n"
+            else:
+                summary = summary + f"{s.author_name[coauthor]}   ({npmid})<br>\n"
+            count_author += 1
+    summary = summary + "<br>\n<br>\n"
+    if count_author == 0:
+        summary = ""
+    return summary
+
+
 def topic_summary(s, topic, min_year=0, abstract=False, review=False, logical_and=False):
     """
     Utility function to calculate topic summary
@@ -888,6 +934,63 @@ def country_html(s, country, min_year=0):
         f.write(summary)
         f.close()
     return
+
+
+def coauthor_html(s, country, min_year=0):
+    """
+    Save html coauthor summary (by country)
+
+    Parameters
+    ----------
+    s : class object
+        PubMedScraper() instance object
+    country : str
+        Country (iso3) or US state code
+    min_year : int, default 0
+        Min year cutoff
+
+    """
+    folder = s.folder + "/coauthor_summary/"
+    dct = geoutils.country_code_to_name()
+    dct.update(geoutils.state_code_to_name())
+    code = country[0] if isinstance(country, list) else country
+    country_auths = get_country_authors(s, code)
+    summary = ""
+    city_auths = {}
+    city_score = {}
+    for auth in country_auths:
+        city = s.author_cities[auth][0]
+        if city in city_auths:
+            city_auths[city] = city_auths[city] + [auth]
+            city_score[city] = city_score[city] + s.author_score[auth]
+        else:
+            city_auths[city] = [auth]
+            city_score[city] = s.author_score[auth]
+    city_auths = sort_dict(city_auths)
+    for city, auths in city_auths.items():
+        city_summary = ""
+        city_auth_count = 0
+        prefix = f"{city.upper()} ({dct[code]}) " + "#" * 20
+        prefix = "<b>" + prefix + "#" * (120 - len(prefix)) + "</b><br><br>"
+        city_summary = city_summary + prefix
+        auths_score = {a: s.author_score[a] for a in auths}
+        auths_score = sort_dict(auths_score)
+        for auth, score in auths_score.items():
+            if score > 1:
+                summary_ = author_summary(s, auth, min_year=min_year)
+                city_summary = city_summary + summary_
+                city_auth_count += 1
+        if city_auth_count:
+            summary = summary + city_summary
+    if len(summary) > 0:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        fname = f"{folder}/{code}.html"
+        f = open(fname, "w+")
+        f.write(summary)
+        f.close()
+    return
+
 
 
 
